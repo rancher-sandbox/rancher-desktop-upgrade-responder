@@ -10,3 +10,10 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# Modifications specific to Rancher Desktop
+.dapper
+bin/
+dist/
+package/GeoLite2-City.mmdb
+package/upgrade-responder
