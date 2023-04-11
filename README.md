@@ -1,3 +1,24 @@
+# This is a fork
+
+that contains changes for use with Rancher Desktop.
+The following things have been changed as compared to upstream:
+
+- The `rancher-desktop` branch is the default branch. `origin/master` tracks
+  `upstream/master`, which allows for a clean separation when incorporating
+  changes from upstream into `rancher-desktop`.
+
+- A `Supported` key is added to versions that are returned to the
+  client under certain conditions. This key indicates whether its version
+  is supported for the version of Rancher Desktop that is querying
+  Upgrade Responder.
+
+- The `Rules` key is added to the JSON config.
+  Rules are used to determine the value of the `Supported` key in
+  each version returned from Upgrade Responder, based on information
+  the client includes about itself in its request. For more information please see
+  [issue 3925 in rancher-sandbox/rancher-desktop](https://github.com/rancher-sandbox/rancher-desktop/issues/3925).
+
+
 # Upgrade Responder[![Build Status](https://drone-publish.longhorn.io/api/badges/longhorn/upgrade-responder/status.svg)](https://drone-publish.longhorn.io/longhorn/upgrade-responder)
 
 ## Overview
