@@ -1,0 +1,50 @@
+{
+  "Rules": [
+    {
+      "Criteria": {
+        "AppVersion": "<1.0.0",
+        "Platform": "darwin",
+        "Arch": "*",
+        "PlatformVersion": "*"
+      },
+      "Constraints": {
+        "Version": "<2.0.0"
+      }
+    },
+    {
+      "Criteria": {
+        "AppVersion": ">3.0.0",
+        "Platform": "darwin",
+        "Arch": "*",
+        "PlatformVersion": "*"
+      },
+      "Constraints": {
+        "Version": "<4.0.0"
+      }
+    }
+  ],
+  "Versions": [
+    {
+      "Name": "v1.2.3",
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": [
+        "v1.2.3"
+      ]
+    },
+    {
+      "Name": "v2.3.4",
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": [
+        "v2.3.4"
+      ]
+    },
+    {
+      "Name": "v4.5.6",
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": [
+        "v4.5.6",
+        "latest"
+      ]
+    }
+  ]
+}
