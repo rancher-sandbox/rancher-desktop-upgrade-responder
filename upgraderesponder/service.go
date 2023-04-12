@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Masterminds/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/Sirupsen/logrus"
 	influxcli "github.com/influxdata/influxdb/client/v2"
 	maxminddb "github.com/oschwald/maxminddb-golang"
