@@ -9,17 +9,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/Sirupsen/logrus"
 	influxcli "github.com/influxdata/influxdb/client/v2"
 	maxminddb "github.com/oschwald/maxminddb-golang"
 	"github.com/pkg/errors"
 
+	rd "github.com/longhorn/upgrade-responder/rancherdesktop"
 	"github.com/longhorn/upgrade-responder/utils"
 )
 
 const (
-	VersionTagLatest  = "latest"
 	AppMinimalVersion = "v0.0.1"
 
 	InfluxDBMeasurement              = "upgrade_request"
@@ -49,12 +48,21 @@ var (
 )
 
 type Server struct {
-	done           chan struct{}
-	VersionMap     map[string]*Version
-	TagVersionsMap map[string][]*Version
-	influxClient   influxcli.Client
-	db             *maxminddb.Reader
-	dbCache        *DBCache
+	done chan struct{}
+	// The set of versions that is returned when the client does
+	// not include the information required to make an InstanceInfo.
+	DefaultVersions []rd.Version
+	// Maps Rules to a slice of versions with Version.Supported
+	// precomputed according to Rule.Constraints.
+	PrecomputedVersions []PrecomputedVersion
+	influxClient        influxcli.Client
+	db                  *maxminddb.Reader
+	dbCache             *DBCache
+}
+
+type PrecomputedVersion struct {
+	Rule     rd.Rule
+	Versions []rd.Version
 }
 
 type Location struct {
@@ -65,50 +73,36 @@ type Location struct {
 	} `json:"country"`
 }
 
-type ResponseConfig struct {
-	Versions []Version
-}
-
-type Version struct {
-	Name                 string // must be in semantic versioning
-	ReleaseDate          string
-	MinUpgradableVersion string // can be empty or semantic versioning
-	Tags                 []string
-	ExtraInfo            map[string]string
-}
-
-type CheckUpgradeRequest struct {
-	AppVersion string            `json:"appVersion"`
-	ExtraInfo  map[string]string `json:"extraInfo"`
-}
-
 type CheckUpgradeResponse struct {
-	Versions                 []Version `json:"versions"`
-	RequestIntervalInMinutes int       `json:"requestIntervalInMinutes"`
+	Versions                 []rd.Version `json:"versions"`
+	RequestIntervalInMinutes int          `json:"requestIntervalInMinutes"`
 }
 
 func NewServer(done chan struct{}, applicationName, configFile, influxURL, influxUser, influxPass, queryPeriod, geodb string, cacheSyncInterval, cacheSize int) (*Server, error) {
 	InfluxDBDatabase = applicationName + "_" + InfluxDBDatabase
 	InfluxDBContinuousQueryPeriod = queryPeriod
 
+	// Parse and validate config
 	path := filepath.Clean(configFile)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "fail to open configFile")
 	}
 	defer f.Close()
-
-	var config ResponseConfig
+	var config rd.ResponseConfig
 	if err := json.NewDecoder(f).Decode(&config); err != nil {
 		return nil, err
 	}
-	s := &Server{
-		done:           done,
-		VersionMap:     map[string]*Version{},
-		TagVersionsMap: map[string][]*Version{},
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	if err := s.validateAndLoadResponseConfig(&config); err != nil {
-		return nil, err
+
+	s := &Server{
+		done:            done,
+		DefaultVersions: config.Versions,
+	}
+	if err := s.generatePrecomputedVersions(config); err != nil {
+		return nil, fmt.Errorf("failed to generate precomputed versions: %w", err)
 	}
 
 	db, err := maxminddb.Open(geodb)
@@ -216,36 +210,6 @@ func (s *Server) createContinuousQueries(dbName string) error {
 	return nil
 }
 
-func (s *Server) validateAndLoadResponseConfig(config *ResponseConfig) error {
-	for i, v := range config.Versions {
-		if len(v.Tags) == 0 {
-			return fmt.Errorf("invalid empty label for %v", v)
-		}
-		if s.VersionMap[v.Name] != nil {
-			return fmt.Errorf("invalid duplicate name %v", v.Name)
-		}
-		if _, err := semver.NewVersion(v.Name); err != nil {
-			return err
-		}
-		if v.MinUpgradableVersion != "" {
-			if _, err := semver.NewVersion(v.MinUpgradableVersion); err != nil {
-				return err
-			}
-		}
-		if _, err := ParseTime(v.ReleaseDate); err != nil {
-			return err
-		}
-		for _, l := range v.Tags {
-			s.TagVersionsMap[l] = append(s.TagVersionsMap[l], &config.Versions[i])
-		}
-		s.VersionMap[v.Name] = &config.Versions[i]
-	}
-	if len(s.TagVersionsMap[VersionTagLatest]) == 0 {
-		return fmt.Errorf("no latest label specified")
-	}
-	return nil
-}
-
 func (s *Server) HealthCheck(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
@@ -253,7 +217,7 @@ func (s *Server) HealthCheck(rw http.ResponseWriter, req *http.Request) {
 func (s *Server) CheckUpgrade(rw http.ResponseWriter, req *http.Request) {
 	var (
 		err       error
-		checkReq  CheckUpgradeRequest
+		checkReq  rd.CheckUpgradeRequest
 		checkResp *CheckUpgradeResponse
 	)
 
@@ -293,35 +257,24 @@ func respondWithJSON(rw http.ResponseWriter, obj interface{}) error {
 	return err
 }
 
-func (s *Server) GenerateCheckUpgradeResponse(request *CheckUpgradeRequest) (*CheckUpgradeResponse, error) {
-	/* disable version dependency reseponse
-	reqVer, err := semver.NewVersion(request.AppVersion)
-	if err != nil {
-		logrus.Warnf("Invalid version in request: %v: %v, response with the latest version", request.AppVersion, err)
-		reqVer, err = semver.NewVersion(AppMinimalVersion)
-		if err != nil {
-			return nil, err
-		}
-	}
-	*/
+func (s *Server) GenerateCheckUpgradeResponse(request *rd.CheckUpgradeRequest) (*CheckUpgradeResponse, error) {
 	resp := &CheckUpgradeResponse{}
 
-	// Only supports `latest` label for now
-	//latestVer, version, err := s.getParsedVersionWithTag(VersionTagLatest)
-	//_, version, err := s.getParsedVersionWithTag(VersionTagLatest)
-	//if err != nil {
-	//	logrus.Errorf("BUG: unable to get an valid tag for %v: %v", VersionTagLatest, err)
-	//	return nil, err
-	//}
-	/* disable version dependency reseponse
-	if reqVer.LessThan(latestVer) {
-		resp.Versions = append(resp.Versions, *version)
-	}
-	*/
-	//resp.Versions = append(resp.Versions, *version)
-
-	for _, v := range s.VersionMap {
-		resp.Versions = append(resp.Versions, *v)
+	instanceInfo, err := rd.NewInstanceInfo(request)
+	if err != nil {
+		logrus.Debugf("could not parse request %+v as InstanceInfo: %s", request, err)
+		resp.Versions = s.DefaultVersions
+	} else {
+		logrus.Debugf("parsed request into InstanceInfo %+v: %s", request, err)
+		for _, precomp := range s.PrecomputedVersions {
+			if precomp.Rule.Test(instanceInfo) {
+				resp.Versions = precomp.Versions
+				break
+			}
+		}
+		if len(resp.Versions) == 0 {
+			resp.Versions = s.DefaultVersions
+		}
 	}
 
 	d, err := time.ParseDuration(InfluxDBContinuousQueryPeriod)
@@ -333,10 +286,6 @@ func (s *Server) GenerateCheckUpgradeResponse(request *CheckUpgradeRequest) (*Ch
 	}
 
 	return resp, nil
-}
-
-func ParseTime(t string) (time.Time, error) {
-	return time.Parse(time.RFC3339, t)
 }
 
 type locationRecord struct {
@@ -372,7 +321,7 @@ func (s *Server) getLocation(addr string) (*Location, error) {
 //}
 
 // Don't need to return error to the requester
-func (s *Server) recordRequest(httpReq *http.Request, req *CheckUpgradeRequest) {
+func (s *Server) recordRequest(httpReq *http.Request, req *rd.CheckUpgradeRequest) {
 	xForwaredFor := httpReq.Header[HTTPHeaderXForwardedFor]
 	publicIP := ""
 	l := len(xForwaredFor)
@@ -419,4 +368,28 @@ func (s *Server) recordRequest(httpReq *http.Request, req *CheckUpgradeRequest) 
 
 		s.dbCache.AddPoint(pt)
 	}
+}
+
+func (s *Server) generatePrecomputedVersions(config rd.ResponseConfig) error {
+	rulesWithPrecomputedVersions := make([]PrecomputedVersion, 0, len(config.Rules))
+	for _, rule := range config.Rules {
+		precomputedVersions := make([]rd.Version, 0, len(config.Versions))
+		for _, version := range config.Versions {
+			precomputedVersion := version
+			supported, err := rule.Supported(version)
+			if err != nil {
+				return fmt.Errorf("failed to compute Supported for Rule %+v and Version %q: %w", rule, version.Name, err)
+			}
+			precomputedVersion.Supported = supported
+			precomputedVersions = append(precomputedVersions, precomputedVersion)
+		}
+		newElement := PrecomputedVersion{
+			Rule:     rule,
+			Versions: precomputedVersions,
+		}
+		rulesWithPrecomputedVersions = append(rulesWithPrecomputedVersions, newElement)
+	}
+
+	s.PrecomputedVersions = rulesWithPrecomputedVersions
+	return nil
 }
