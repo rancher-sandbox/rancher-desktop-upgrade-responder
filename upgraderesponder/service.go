@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -60,6 +58,10 @@ type Server struct {
 	dbCache             *DBCache
 }
 
+// PrecomputedVersion is used as a "mapping" from a Rule to the set of
+// Versions passed in config. The Supported key of each Version is
+// precomputed according to Rule.Constraints, which facilitates
+// validation at startup and reduces CPU usage during runtime.
 type PrecomputedVersion struct {
 	Rule     rd.Rule
 	Versions []rd.Version
@@ -82,19 +84,9 @@ func NewServer(done chan struct{}, applicationName, configFile, influxURL, influ
 	InfluxDBDatabase = applicationName + "_" + InfluxDBDatabase
 	InfluxDBContinuousQueryPeriod = queryPeriod
 
-	// Parse and validate config
-	path := filepath.Clean(configFile)
-	f, err := os.Open(path)
+	config, err := rd.ReadConfig(configFile)
 	if err != nil {
-		return nil, errors.Wrap(err, "fail to open configFile")
-	}
-	defer f.Close()
-	var config rd.ResponseConfig
-	if err := json.NewDecoder(f).Decode(&config); err != nil {
-		return nil, err
-	}
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
 	s := &Server{
@@ -267,7 +259,7 @@ func (s *Server) GenerateCheckUpgradeResponse(request *rd.CheckUpgradeRequest) (
 	} else {
 		logrus.Debugf("parsed request into InstanceInfo %+v: %s", request, err)
 		for _, precomp := range s.PrecomputedVersions {
-			if precomp.Rule.Test(instanceInfo) {
+			if precomp.Rule.AppliesTo(instanceInfo) {
 				resp.Versions = precomp.Versions
 				break
 			}
