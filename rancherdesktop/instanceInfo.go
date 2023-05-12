@@ -8,15 +8,15 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
-var validPlatforms map[string]struct{} = map[string]struct{}{
-	"win32":  {},
-	"darwin": {},
-	"linux":  {},
+var validPlatform map[string]bool = map[string]bool{
+	"win32":  true,
+	"darwin": true,
+	"linux":  true,
 }
 
-var validArchs map[string]struct{} = map[string]struct{}{
-	"x64":   {},
-	"arm64": {},
+var validArch map[string]bool = map[string]bool{
+	"x64":   true,
+	"arm64": true,
 }
 
 type CheckUpgradeRequest struct {
@@ -53,12 +53,12 @@ func NewInstanceInfo(checkUpgradeRequest *CheckUpgradeRequest) (InstanceInfo, er
 	}
 
 	platform := components[0]
-	if _, platformOk := validPlatforms[platform]; !platformOk {
+	if !validPlatform[platform] {
 		return InstanceInfo{}, fmt.Errorf("invalid platform %q", platform)
 	}
 
 	arch := components[1]
-	if _, archOk := validArchs[arch]; !archOk {
+	if !validArch[arch] {
 		return InstanceInfo{}, fmt.Errorf("invalid arch %q", arch)
 	}
 
@@ -68,8 +68,8 @@ func NewInstanceInfo(checkUpgradeRequest *CheckUpgradeRequest) (InstanceInfo, er
 	}
 	platformVersion, err := semver.NewVersion(rawPlatformVersion)
 	if err != nil {
-		msg := "failed to parse platformVersion %q as semver: %w"
-		return InstanceInfo{}, fmt.Errorf(msg, platformVersion, err)
+		err := fmt.Errorf("failed to parse platformVersion %q as semver: %w", platformVersion, err)
+		return InstanceInfo{}, err
 	}
 
 	return InstanceInfo{

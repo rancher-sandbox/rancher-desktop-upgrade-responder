@@ -39,17 +39,17 @@ func (rule Rule) Validate() error {
 	}
 
 	// validate Criteria.Platform
-	if _, ok := validPlatforms[rule.Criteria.Platform]; !ok {
+	if !validPlatform[rule.Criteria.Platform] {
 		return fmt.Errorf("invalid Criteria.Platform %q", rule.Criteria.Platform)
 	}
 
 	// validate Criteria.Arch
-	validCriteriaArchs := map[string]struct{}{}
-	for key, value := range validArchs {
-		validCriteriaArchs[key] = value
+	validCriteriaArch := map[string]bool{}
+	for key, value := range validArch {
+		validCriteriaArch[key] = value
 	}
-	validCriteriaArchs["*"] = struct{}{}
-	if _, ok := validCriteriaArchs[rule.Criteria.Arch]; !ok {
+	validCriteriaArch["*"] = true
+	if !validCriteriaArch[rule.Criteria.Arch] {
 		return fmt.Errorf("invalid Criteria.Arch %q", rule.Criteria.Arch)
 	}
 

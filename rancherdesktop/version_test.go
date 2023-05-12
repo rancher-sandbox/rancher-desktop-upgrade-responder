@@ -11,23 +11,9 @@ func TestVersion(t *testing.T) {
 
 		t.Run("should return nil for a valid version", func(t *testing.T) {
 			version := Version{
-				Name:                 "v1.2.3",
-				ReleaseDate:          "2022-07-28T11:00:00Z",
-				MinUpgradableVersion: "",
-				Tags:                 []string{"testTag"},
-			}
-			err := version.Validate()
-			if err != nil {
-				t.FailNow()
-			}
-		})
-
-		t.Run("should return nil for a valid version with MinUpgradableVersion nonempty", func(t *testing.T) {
-			version := Version{
-				Name:                 "v1.2.3",
-				ReleaseDate:          "2022-07-28T11:00:00Z",
-				MinUpgradableVersion: "v2.3.4",
-				Tags:                 []string{"testTag"},
+				Name:        "v1.2.3",
+				ReleaseDate: "2022-07-28T11:00:00Z",
+				Tags:        []string{"testTag"},
 			}
 			err := version.Validate()
 			if err != nil {
@@ -44,40 +30,27 @@ func TestVersion(t *testing.T) {
 			{
 				Description: "should return error if no tags are present",
 				Version: Version{
-					Name:                 "v1.2.3",
-					ReleaseDate:          "2022-07-28T11:00:00Z",
-					MinUpgradableVersion: "",
-					Tags:                 []string{},
+					Name:        "v1.2.3",
+					ReleaseDate: "2022-07-28T11:00:00Z",
+					Tags:        []string{},
 				},
 				ExpectedError: "invalid empty label",
 			},
 			{
 				Description: "should return error if Version.Name is not valid semver",
 				Version: Version{
-					Name:                 "invalidSemver",
-					ReleaseDate:          "2022-07-28T11:00:00Z",
-					MinUpgradableVersion: "",
-					Tags:                 []string{"testTag"},
+					Name:        "invalidSemver",
+					ReleaseDate: "2022-07-28T11:00:00Z",
+					Tags:        []string{"testTag"},
 				},
 				ExpectedError: "failed to parse Name",
 			},
 			{
-				Description: "should return error if Version.MinUpgradableVersion is nonempty and not valid semver",
-				Version: Version{
-					Name:                 "v1.2.3",
-					ReleaseDate:          "2022-07-28T11:00:00Z",
-					MinUpgradableVersion: "invalidSemver",
-					Tags:                 []string{"testTag"},
-				},
-				ExpectedError: "failed to parse MinUpgradableVersion",
-			},
-			{
 				Description: "should return error if Version.ReleaseDate is not in RFC3339 format",
 				Version: Version{
-					Name:                 "v1.2.3",
-					ReleaseDate:          "notValidRFC3339",
-					MinUpgradableVersion: "",
-					Tags:                 []string{"testTag"},
+					Name:        "v1.2.3",
+					ReleaseDate: "notValidRFC3339",
+					Tags:        []string{"testTag"},
 				},
 				ExpectedError: "failed to parse ReleaseDate",
 			},

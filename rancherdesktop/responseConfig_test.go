@@ -13,16 +13,14 @@ func TestResponseConfig(t *testing.T) {
 			responseConfig := ResponseConfig{
 				Versions: []Version{
 					{
-						Name:                 "v1.2.3",
-						ReleaseDate:          "2022-07-28T11:00:00Z",
-						MinUpgradableVersion: "",
-						Tags:                 []string{"v1.2.3"},
+						Name:        "v1.2.3",
+						ReleaseDate: "2022-07-28T11:00:00Z",
+						Tags:        []string{"v1.2.3"},
 					},
 					{
-						Name:                 "v2.3.4",
-						ReleaseDate:          "2022-07-28T11:00:00Z",
-						MinUpgradableVersion: "",
-						Tags:                 []string{"v2.3.4", "latest"},
+						Name:        "v2.3.4",
+						ReleaseDate: "2022-07-28T11:00:00Z",
+						Tags:        []string{"v2.3.4", "latest"},
 					},
 				},
 			}
@@ -43,16 +41,14 @@ func TestResponseConfig(t *testing.T) {
 				ResponseConfig: ResponseConfig{
 					Versions: []Version{
 						{
-							Name:                 "v1.2.3",
-							ReleaseDate:          "2022-07-28T11:00:00Z",
-							MinUpgradableVersion: "",
-							Tags:                 []string{"v1.2.3"},
+							Name:        "v1.2.3",
+							ReleaseDate: "2022-07-28T11:00:00Z",
+							Tags:        []string{"v1.2.3"},
 						},
 						{
-							Name:                 "v1.2.3",
-							ReleaseDate:          "2022-07-28T11:00:00Z",
-							MinUpgradableVersion: "",
-							Tags:                 []string{"v1.2.3", "latest"},
+							Name:        "v1.2.3",
+							ReleaseDate: "2022-07-28T11:00:00Z",
+							Tags:        []string{"v1.2.3", "latest"},
 						},
 					},
 				},
@@ -63,10 +59,9 @@ func TestResponseConfig(t *testing.T) {
 				ResponseConfig: ResponseConfig{
 					Versions: []Version{
 						{
-							Name:                 "v1.2.3",
-							ReleaseDate:          "2022-07-28T11:00:00Z",
-							MinUpgradableVersion: "",
-							Tags:                 []string{"v1.2.3"},
+							Name:        "v1.2.3",
+							ReleaseDate: "2022-07-28T11:00:00Z",
+							Tags:        []string{"v1.2.3"},
 						},
 					},
 				},
