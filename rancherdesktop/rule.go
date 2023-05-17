@@ -1,6 +1,7 @@
 package rancherdesktop
 
 import (
+	"errors"
 	"fmt"
 	"github.com/Masterminds/semver/v3"
 )
@@ -39,7 +40,7 @@ func (rule Rule) Validate() error {
 	}
 
 	// validate Criteria.Platform
-	if !validPlatform[rule.Criteria.Platform] {
+	if rule.Criteria.Platform != "*" && !validPlatform[rule.Criteria.Platform] {
 		return fmt.Errorf("invalid Criteria.Platform %q", rule.Criteria.Platform)
 	}
 
@@ -51,6 +52,9 @@ func (rule Rule) Validate() error {
 	// validate Criteria.PlatformVersion
 	if rule.Criteria.PlatformVersion == nil {
 		return fmt.Errorf("invalid Criteria.PlatformVersion %q", rule.Criteria.PlatformVersion)
+	}
+	if rule.Criteria.Platform == "*" && rule.Criteria.PlatformVersion.String() != "*" {
+		return errors.New("Criteria.Platform must be specified if Criteria.PlatformVersion is specified")
 	}
 
 	// validate Constraints.Version
@@ -68,7 +72,7 @@ func (rule Rule) AppliesTo(instanceInfo InstanceInfo) bool {
 		return false
 	}
 
-	if rule.Criteria.Platform != instanceInfo.Platform {
+	if rule.Criteria.Platform != "*" && rule.Criteria.Platform != instanceInfo.Platform {
 		return false
 	}
 
@@ -76,9 +80,7 @@ func (rule Rule) AppliesTo(instanceInfo InstanceInfo) bool {
 		return false
 	}
 
-	if rule.Criteria.PlatformVersion.String() != "*" &&
-		instanceInfo.Platform != "linux" &&
-		!rule.Criteria.PlatformVersion.Check(instanceInfo.PlatformVersion) {
+	if !rule.Criteria.PlatformVersion.Check(instanceInfo.PlatformVersion) {
 		return false
 	}
 

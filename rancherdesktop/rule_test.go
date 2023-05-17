@@ -61,10 +61,15 @@ func TestRule(t *testing.T) {
 	t.Run(".Validate", func(t *testing.T) {
 		t.Run("should return nil if Rule is valid", func(t *testing.T) {
 			rules := []Rule{
-				newRule(t, "*", "linux", "x64", "*", "*"),
-				newRule(t, "*", "darwin", "x64", "*", "*"),
-				newRule(t, "*", "win32", "x64", "*", "*"),
-				newRule(t, "*", "darwin", "arm64", "*", "*"),
+				newRule(t, "*", "*", "*", "*", "*"),
+				newRule(t, "*", "linux", "*", "*", "*"),
+				newRule(t, "*", "darwin", "*", "*", "*"),
+				newRule(t, "*", "win32", "*", "*", "*"),
+				newRule(t, "*", "*", "x64", "*", "*"),
+				newRule(t, "*", "*", "arm64", "*", "*"),
+				newRule(t, "*", "linux", "*", ">1.2.3", "*"),
+				newRule(t, "*", "darwin", "*", ">1.2.3", "*"),
+				newRule(t, "*", "win32", "*", ">1.2.3", "*"),
 			}
 			for _, rule := range rules {
 				err := rule.Validate()
@@ -131,6 +136,11 @@ func TestRule(t *testing.T) {
 				ExpectedError: "invalid Criteria.PlatformVersion",
 			},
 			{
+				Description:   "should return error if Criteria.PlatformVersion is not * and Criteria.Platform is *",
+				Rule:          newRule(t, "*", "*", "*", ">1.2.3", "*"),
+				ExpectedError: "Criteria.Platform must be specified if Criteria.PlatformVersion is specified",
+			},
+			{
 				Description: "should return error if Constraints.Version is nil",
 				Rule: Rule{
 					Criteria: Criteria{
@@ -158,7 +168,7 @@ func TestRule(t *testing.T) {
 		}
 	})
 
-	t.Run(".Test", func(t *testing.T) {
+	t.Run(".AppliesTo", func(t *testing.T) {
 		testCases := []struct {
 			Description    string
 			Rule           Rule
@@ -166,33 +176,45 @@ func TestRule(t *testing.T) {
 			ExpectedReturn bool
 		}{
 			{
-				Description:    "should always return true when all fields other than Platform are *",
-				Rule:           newRule(t, "*", "darwin", "*", "*", "*"),
+				Description:    "should always return true when all fields are *",
+				Rule:           newRule(t, "*", "*", "*", "*", "*"),
 				InstanceInfo:   newInstanceInfo(t, "1.2.3", "darwin", "x64", "2.3.45"),
 				ExpectedReturn: true,
 			},
 			{
-				Description:    "should always return true when all fields other than Platform are *",
-				Rule:           newRule(t, "*", "darwin", "*", "*", "*"),
+				Description:    "should always return true when all fields are *",
+				Rule:           newRule(t, "*", "*", "*", "*", "*"),
 				InstanceInfo:   newInstanceInfo(t, "1.2.3", "darwin", "arm64", "2.3.45"),
 				ExpectedReturn: true,
 			},
 			{
-				Description:    "should always return true when all fields other than Platform are *",
-				Rule:           newRule(t, "*", "darwin", "*", "*", "*"),
+				Description:    "should always return true when all fields are *",
+				Rule:           newRule(t, "*", "*", "*", "*", "*"),
 				InstanceInfo:   newInstanceInfo(t, "1.2.3", "darwin", "testArch", "0.0.0"),
 				ExpectedReturn: true,
 			},
 			{
-				Description:    "should always return true when all fields other than Platform are *",
-				Rule:           newRule(t, "*", "darwin", "*", "*", "*"),
+				Description:    "should always return true when all fields are *",
+				Rule:           newRule(t, "*", "*", "*", "*", "*"),
 				InstanceInfo:   newInstanceInfo(t, "11.22.33", "darwin", "testArch", "2.3.45"),
 				ExpectedReturn: true,
 			},
 			{
-				Description:    "should always return true when all fields other than Platform are *",
-				Rule:           newRule(t, "*", "darwin", "*", "*", "*"),
+				Description:    "should always return true when all fields are *",
+				Rule:           newRule(t, "*", "*", "*", "*", "*"),
 				InstanceInfo:   newInstanceInfo(t, "1.2.3", "darwin", "testArch", "11.22.333"),
+				ExpectedReturn: true,
+			},
+			{
+				Description:    "should always return true when all fields are *",
+				Rule:           newRule(t, "*", "*", "*", "*", "*"),
+				InstanceInfo:   newInstanceInfo(t, "1.2.3", "win32", "testArch", "11.22.333"),
+				ExpectedReturn: true,
+			},
+			{
+				Description:    "should always return true when all fields are *",
+				Rule:           newRule(t, "*", "*", "*", "*", "*"),
+				InstanceInfo:   newInstanceInfo(t, "1.2.3", "linux", "testArch", "11.22.333"),
 				ExpectedReturn: true,
 			},
 			{
@@ -232,24 +254,6 @@ func TestRule(t *testing.T) {
 				ExpectedReturn: false,
 			},
 			{
-				Description:    "should return true for any value of PlatformVersion when Platform is Linux",
-				Rule:           newRule(t, "*", "linux", "*", ">0.0.0", "*"),
-				InstanceInfo:   newInstanceInfo(t, "1.2.3", "linux", "x64", "1.2.3"),
-				ExpectedReturn: true,
-			},
-			{
-				Description:    "should return true for any value of PlatformVersion when Platform is Linux",
-				Rule:           newRule(t, "*", "linux", "*", ">0.0.0", "*"),
-				InstanceInfo:   newInstanceInfo(t, "1.2.3", "linux", "x64", "12.13.23"),
-				ExpectedReturn: true,
-			},
-			{
-				Description:    "should return true for any value of PlatformVersion when Platform is Linux",
-				Rule:           newRule(t, "*", "linux", "*", ">0.0.0", "*"),
-				InstanceInfo:   newInstanceInfo(t, "1.2.3", "linux", "x64", "0.0.0"),
-				ExpectedReturn: true,
-			},
-			{
 				Description:    "should return true if PlatformVersion criterion is satisfied",
 				Rule:           newRule(t, "*", "darwin", "*", ">1.2.3", "*"),
 				InstanceInfo:   newInstanceInfo(t, "1.2.3", "darwin", "x64", "2.3.45"),
@@ -259,6 +263,18 @@ func TestRule(t *testing.T) {
 				Description:    "should return false if PlatformVersion criterion is not satisfied",
 				Rule:           newRule(t, "*", "darwin", "*", "<1.2.3", "*"),
 				InstanceInfo:   newInstanceInfo(t, "1.2.3", "darwin", "x64", "2.3.45"),
+				ExpectedReturn: false,
+			},
+			{
+				Description:    "should return true if PlatformVersion criterion is satisfied on Linux",
+				Rule:           newRule(t, "*", "linux", "*", ">0.0.0", "*"),
+				InstanceInfo:   newInstanceInfo(t, "1.2.3", "linux", "x64", "1.0.0"),
+				ExpectedReturn: true,
+			},
+			{
+				Description:    "should return false if PlatformVersion criterion is not satisfied on Linux",
+				Rule:           newRule(t, "*", "linux", "*", "<1.0.0", "*"),
+				InstanceInfo:   newInstanceInfo(t, "1.2.3", "linux", "x64", "12.13.23"),
 				ExpectedReturn: false,
 			},
 		}
