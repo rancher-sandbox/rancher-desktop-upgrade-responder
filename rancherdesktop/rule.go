@@ -44,12 +44,7 @@ func (rule Rule) Validate() error {
 	}
 
 	// validate Criteria.Arch
-	validCriteriaArch := map[string]bool{}
-	for key, value := range validArch {
-		validCriteriaArch[key] = value
-	}
-	validCriteriaArch["*"] = true
-	if !validCriteriaArch[rule.Criteria.Arch] {
+	if rule.Criteria.Arch != "*" && !validArch[rule.Criteria.Arch] {
 		return fmt.Errorf("invalid Criteria.Arch %q", rule.Criteria.Arch)
 	}
 
