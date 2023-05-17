@@ -39,8 +39,8 @@ func (responseConfig *ResponseConfig) Validate() error {
 		}
 		versionMap[version.Name] = version
 	}
-	if len(tagVersionsMap[VersionTagLatest]) == 0 {
-		return errors.New("no latest label specified")
+	if len(tagVersionsMap[VersionTagLatest]) != 1 {
+		return errors.New("did not find exactly one latest tag")
 	}
 
 	return nil
