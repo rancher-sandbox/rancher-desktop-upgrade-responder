@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func newCheckUpgradeRequest(appVersion, platform, platformVersion string) *CheckUpgradeRequest {
-	return &CheckUpgradeRequest{
+func newCheckUpgradeRequest(appVersion, platform, platformVersion string) CheckUpgradeRequest {
+	return CheckUpgradeRequest{
 		AppVersion: appVersion,
 		ExtraInfo: map[string]string{
 			"platform":        platform,
@@ -48,7 +48,7 @@ func TestNewInstanceInfo(t *testing.T) {
 
 	testCases := []struct {
 		Description         string
-		CheckUpgradeRequest *CheckUpgradeRequest
+		CheckUpgradeRequest CheckUpgradeRequest
 		ExpectedError       string
 	}{
 		{
@@ -73,7 +73,7 @@ func TestNewInstanceInfo(t *testing.T) {
 		},
 		{
 			Description: "should fail if CheckUpgradeRequest.ExtraInfo.platform is not present",
-			CheckUpgradeRequest: &CheckUpgradeRequest{
+			CheckUpgradeRequest: CheckUpgradeRequest{
 				AppVersion: "1.2.3",
 				ExtraInfo: map[string]string{
 					"platformVersion": "12.0.3",
@@ -93,7 +93,7 @@ func TestNewInstanceInfo(t *testing.T) {
 		},
 		{
 			Description: "should fail if CheckUpgradeRequest.ExtraInfo.platformVersion is not present",
-			CheckUpgradeRequest: &CheckUpgradeRequest{
+			CheckUpgradeRequest: CheckUpgradeRequest{
 				AppVersion: "1.2.3",
 				ExtraInfo: map[string]string{
 					"platform": "darwin-x64",

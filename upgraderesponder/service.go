@@ -225,7 +225,7 @@ func (s *Server) CheckUpgrade(rw http.ResponseWriter, req *http.Request) {
 
 	s.recordRequest(req, &checkReq)
 
-	checkResp, err = s.GenerateCheckUpgradeResponse(&checkReq)
+	checkResp, err = s.GenerateCheckUpgradeResponse(checkReq)
 	if err != nil {
 		logrus.Errorf("Failed to GenerateCheckUpgradeResponse: %v", err)
 		return
@@ -249,7 +249,7 @@ func respondWithJSON(rw http.ResponseWriter, obj interface{}) error {
 	return err
 }
 
-func (s *Server) GenerateCheckUpgradeResponse(request *rd.CheckUpgradeRequest) (*CheckUpgradeResponse, error) {
+func (s *Server) GenerateCheckUpgradeResponse(request rd.CheckUpgradeRequest) (*CheckUpgradeResponse, error) {
 	resp := &CheckUpgradeResponse{}
 
 	instanceInfo, err := rd.NewInstanceInfo(request)

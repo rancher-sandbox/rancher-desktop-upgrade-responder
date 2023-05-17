@@ -37,7 +37,7 @@ type InstanceInfo struct {
 // NewInstanceInfo converts the general CheckUpgradeRequest type into an InstanceInfo.
 // If the CheckUpgradeRequest does not contain the needed info (which is optional in
 // a CheckUpgradeRequest), an error is returned.
-func NewInstanceInfo(checkUpgradeRequest *CheckUpgradeRequest) (InstanceInfo, error) {
+func NewInstanceInfo(checkUpgradeRequest CheckUpgradeRequest) (InstanceInfo, error) {
 	appVersion, err := semver.NewVersion(checkUpgradeRequest.AppVersion)
 	if err != nil {
 		return InstanceInfo{}, fmt.Errorf("failed to parse AppVersion as semver: %w", err)

@@ -43,7 +43,7 @@ func TestServer(t *testing.T) {
 
 		t.Run("all Version.Supported should be true when request cannot be parsed to InstanceInfo", func(t *testing.T) {
 			server := getTestServer(t, testConfig)
-			checkUpgradeRequest := &rd.CheckUpgradeRequest{
+			checkUpgradeRequest := rd.CheckUpgradeRequest{
 				AppVersion: "v1.2.3",
 				ExtraInfo: map[string]string{
 					"platform": "darwin-x64",
@@ -61,7 +61,7 @@ func TestServer(t *testing.T) {
 
 		t.Run("all Version.Supported should be true when request does not match any Rules", func(t *testing.T) {
 			server := getTestServer(t, testConfig)
-			checkUpgradeRequest := &rd.CheckUpgradeRequest{
+			checkUpgradeRequest := rd.CheckUpgradeRequest{
 				AppVersion: "v2.0.0",
 				ExtraInfo: map[string]string{
 					"platform":        "darwin-x64",
@@ -98,7 +98,7 @@ func TestServer(t *testing.T) {
 			}
 			for _, testCase := range testCases {
 				server := getTestServer(t, testConfig)
-				checkUpgradeRequest := &rd.CheckUpgradeRequest{
+				checkUpgradeRequest := rd.CheckUpgradeRequest{
 					AppVersion: testCase.AppVersion,
 					ExtraInfo: map[string]string{
 						"platform":        "darwin-x64",
@@ -123,7 +123,7 @@ func TestServer(t *testing.T) {
 				t.Fatalf("unexpected error parsing config: %s", err)
 			}
 			server := getTestServer(t, config)
-			checkUpgradeRequest := &rd.CheckUpgradeRequest{
+			checkUpgradeRequest := rd.CheckUpgradeRequest{
 				AppVersion: "v1.0.0",
 				ExtraInfo: map[string]string{
 					"platform":        "darwin-x64",
