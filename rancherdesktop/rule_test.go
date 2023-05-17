@@ -286,7 +286,6 @@ func TestRule(t *testing.T) {
 				Version: Version{
 					Name:        "v1.2.3",
 					ReleaseDate: "2022-07-28T11:00:00Z",
-					Tags:        []string{"v1.2.3"},
 				},
 				ExpectedReturn: false,
 			},
@@ -296,7 +295,6 @@ func TestRule(t *testing.T) {
 				Version: Version{
 					Name:        "v1.2.3",
 					ReleaseDate: "2022-07-28T11:00:00Z",
-					Tags:        []string{"v1.2.3"},
 				},
 				ExpectedReturn: true,
 			},
@@ -320,7 +318,6 @@ func TestRule(t *testing.T) {
 			version := Version{
 				Name:        "invalidSemver",
 				ReleaseDate: "2022-07-28T11:00:00Z",
-				Tags:        []string{"v1.2.3"},
 			}
 			rule := newRule(t, "*", "darwin", "*", "*", "<2.0.0")
 			_, err := rule.Supported(version)

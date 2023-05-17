@@ -15,12 +15,11 @@ func TestResponseConfig(t *testing.T) {
 					{
 						Name:        "v1.2.3",
 						ReleaseDate: "2022-07-28T11:00:00Z",
-						Tags:        []string{"v1.2.3"},
 					},
 					{
 						Name:        "v2.3.4",
 						ReleaseDate: "2022-07-28T11:00:00Z",
-						Tags:        []string{"v2.3.4", "latest"},
+						Tags:        []string{"latest"},
 					},
 				},
 			}
@@ -43,12 +42,10 @@ func TestResponseConfig(t *testing.T) {
 						{
 							Name:        "v1.2.3",
 							ReleaseDate: "2022-07-28T11:00:00Z",
-							Tags:        []string{"v1.2.3"},
 						},
 						{
 							Name:        "v1.2.3",
 							ReleaseDate: "2022-07-28T11:00:00Z",
-							Tags:        []string{"v1.2.3", "latest"},
 						},
 					},
 				},
@@ -61,7 +58,6 @@ func TestResponseConfig(t *testing.T) {
 						{
 							Name:        "v1.2.3",
 							ReleaseDate: "2022-07-28T11:00:00Z",
-							Tags:        []string{"v1.2.3"},
 						},
 					},
 				},
@@ -74,12 +70,12 @@ func TestResponseConfig(t *testing.T) {
 						{
 							Name:        "v1.2.3",
 							ReleaseDate: "2022-07-28T11:00:00Z",
-							Tags:        []string{"v1.2.3", "latest"},
+							Tags:        []string{"latest"},
 						},
 						{
 							Name:        "v2.3.4",
 							ReleaseDate: "2022-07-28T11:00:00Z",
-							Tags:        []string{"2.3.4", "latest"},
+							Tags:        []string{"latest"},
 						},
 					},
 				},

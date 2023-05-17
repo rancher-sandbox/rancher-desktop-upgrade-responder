@@ -13,7 +13,6 @@ func TestVersion(t *testing.T) {
 			version := Version{
 				Name:        "v1.2.3",
 				ReleaseDate: "2022-07-28T11:00:00Z",
-				Tags:        []string{"testTag"},
 			}
 			err := version.Validate()
 			if err != nil {
@@ -28,20 +27,10 @@ func TestVersion(t *testing.T) {
 			ExpectedError string
 		}{
 			{
-				Description: "should return error if no tags are present",
-				Version: Version{
-					Name:        "v1.2.3",
-					ReleaseDate: "2022-07-28T11:00:00Z",
-					Tags:        []string{},
-				},
-				ExpectedError: "invalid empty label",
-			},
-			{
 				Description: "should return error if Version.Name is not valid semver",
 				Version: Version{
 					Name:        "invalidSemver",
 					ReleaseDate: "2022-07-28T11:00:00Z",
-					Tags:        []string{"testTag"},
 				},
 				ExpectedError: "failed to parse Name",
 			},
@@ -50,7 +39,6 @@ func TestVersion(t *testing.T) {
 				Version: Version{
 					Name:        "v1.2.3",
 					ReleaseDate: "notValidRFC3339",
-					Tags:        []string{"testTag"},
 				},
 				ExpectedError: "failed to parse ReleaseDate",
 			},

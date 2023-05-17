@@ -22,9 +22,6 @@ type Version struct {
 
 // Validate is used to check whether a Version is valid.
 func (version *Version) Validate() error {
-	if len(version.Tags) == 0 {
-		return fmt.Errorf("invalid empty label for %v", version)
-	}
 	if _, err := semver.NewVersion(version.Name); err != nil {
 		return fmt.Errorf("failed to parse Name: %w", err)
 	}
