@@ -3,7 +3,7 @@ module github.com/longhorn/upgrade-responder
 go 1.17
 
 require (
-	github.com/Masterminds/semver v1.5.0
+	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Sirupsen/logrus v0.10.0
 	github.com/gorilla/mux v1.8.0
 	github.com/influxdata/influxdb v1.8.5

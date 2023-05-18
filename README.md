@@ -22,8 +22,9 @@ For the purposes of Rancher Desktop development, several files have been added
 in `rancherdesktop/` that make development easier:
 
 `influxdb.sh`: starts an instance of influxDB for use with a development build of Upgrade Responder  
-`sample-config.json`: a sample JSON config file that works with the Rancher-Desktop-specific modifications  
 `run.sh`: runs a development build of Upgrade Responder  
+
+Also note that an example configuration can be found at `rancherdesktop/testdata/test-config.json`.
 
 
 # Upgrade Responder[![Build Status](https://drone-publish.longhorn.io/api/badges/longhorn/upgrade-responder/status.svg)](https://drone-publish.longhorn.io/longhorn/upgrade-responder)
