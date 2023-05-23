@@ -22,7 +22,7 @@ type Version struct {
 
 // Validate is used to check whether a Version is valid.
 func (version *Version) Validate() error {
-	if _, err := semver.NewVersion(version.Name); err != nil {
+	if _, err := semver.StrictNewVersion(version.Name); err != nil {
 		return fmt.Errorf("failed to parse Name: %w", err)
 	}
 	if _, err := time.Parse(time.RFC3339, version.ReleaseDate); err != nil {
