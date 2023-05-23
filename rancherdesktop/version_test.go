@@ -11,7 +11,7 @@ func TestVersion(t *testing.T) {
 
 		t.Run("should return nil for a valid version", func(t *testing.T) {
 			version := Version{
-				Name:        "v1.2.3",
+				Name:        "1.2.3",
 				ReleaseDate: "2022-07-28T11:00:00Z",
 			}
 			err := version.Validate()
@@ -27,7 +27,7 @@ func TestVersion(t *testing.T) {
 			ExpectedError string
 		}{
 			{
-				Description: "should return error if Version.Name is not valid semver",
+				Description: "should return error if Version.Name is not close to valid semver",
 				Version: Version{
 					Name:        "invalidSemver",
 					ReleaseDate: "2022-07-28T11:00:00Z",
@@ -35,9 +35,25 @@ func TestVersion(t *testing.T) {
 				ExpectedError: "failed to parse Name",
 			},
 			{
-				Description: "should return error if Version.ReleaseDate is not in RFC3339 format",
+				Description: "should return error if Version.Name starts with a v",
 				Version: Version{
 					Name:        "v1.2.3",
+					ReleaseDate: "2022-07-28T11:00:00Z",
+				},
+				ExpectedError: "failed to parse Name",
+			},
+			{
+				Description: "should return error if Version.Name has only two dot-separated sections",
+				Version: Version{
+					Name:        "1.2",
+					ReleaseDate: "2022-07-28T11:00:00Z",
+				},
+				ExpectedError: "failed to parse Name",
+			},
+			{
+				Description: "should return error if Version.ReleaseDate is not in RFC3339 format",
+				Version: Version{
+					Name:        "1.2.3",
 					ReleaseDate: "notValidRFC3339",
 				},
 				ExpectedError: "failed to parse ReleaseDate",

@@ -300,7 +300,7 @@ func TestRule(t *testing.T) {
 				Description: "should return false for a version that does not satisfy the Version constraint",
 				Rule:        newRule(t, "*", "darwin", "*", "*", ">2.0.0"),
 				Version: Version{
-					Name:        "v1.2.3",
+					Name:        "1.2.3",
 					ReleaseDate: "2022-07-28T11:00:00Z",
 				},
 				ExpectedReturn: false,
@@ -309,7 +309,7 @@ func TestRule(t *testing.T) {
 				Description: "should return true for a version that satisfies the Version constraint",
 				Rule:        newRule(t, "*", "darwin", "*", "*", "<2.0.0"),
 				Version: Version{
-					Name:        "v1.2.3",
+					Name:        "1.2.3",
 					ReleaseDate: "2022-07-28T11:00:00Z",
 				},
 				ExpectedReturn: true,

@@ -257,7 +257,7 @@ func (s *Server) GenerateCheckUpgradeResponse(request rd.CheckUpgradeRequest) (*
 		logrus.Debugf("could not parse request %+v as InstanceInfo: %s", request, err)
 		resp.Versions = s.DefaultVersions
 	} else {
-		logrus.Debugf("parsed request into InstanceInfo %+v: %s", request, err)
+		logrus.Debugf("parsed request into InstanceInfo %+v", request)
 		for _, precomp := range s.PrecomputedVersions {
 			if precomp.Rule.AppliesTo(instanceInfo) {
 				resp.Versions = precomp.Versions
