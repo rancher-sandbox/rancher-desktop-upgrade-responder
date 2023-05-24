@@ -28,8 +28,8 @@ configMap:
 replicaCount: 3
 
 image:
-  repository: longhornio/upgrade-responder
-  tag: v0.1.5
+  repository: ghcr.io/rancher-sandbox/rancher-desktop-upgrade-responder
+  tag: thismustbeset
   pullPolicy: IfNotPresent
 
 nameOverride: ""

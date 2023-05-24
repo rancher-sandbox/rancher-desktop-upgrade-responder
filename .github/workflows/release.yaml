@@ -1,0 +1,39 @@
+name: Build and upload container image
+on:
+  push:
+    branches: ['rancher-desktop']
+  workflow_dispatch: {}
+
+jobs:
+  linux-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+
+      - name: Build Upgrade Responder
+        run: make
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: package
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
