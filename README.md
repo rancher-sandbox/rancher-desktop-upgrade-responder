@@ -1,30 +1,197 @@
-# This is a fork
+# Attention: this is a fork
 
-that contains changes for use with Rancher Desktop.
-The following things have been changed as compared to upstream:
+This fork contains changes compared to the upstream repo (longhorn/upgrade-responder).
+These changes were made specifically for Rancher Desktop. For more details read on.
+
+## What has been changed relative to upstream?
 
 - The `rancher-desktop` branch is the default branch. `origin/master` tracks
   `upstream/master`, which allows for a clean separation when incorporating
   changes from upstream into `rancher-desktop`.
 
 - A `Supported` key is added to versions that are returned to the
-  client under certain conditions. This key indicates whether its version
-  is supported for the version of Rancher Desktop that is querying
+  client under certain conditions. `Supported` indicates whether a version
+  is supported for the installation of Rancher Desktop that is querying
   Upgrade Responder.
 
-- The `Rules` key is added to the JSON config.
-  Rules are used to determine the value of the `Supported` key in
-  each version returned from Upgrade Responder, based on information
-  the client includes about itself in its request. For more information please see
-  [issue 3925 in rancher-sandbox/rancher-desktop](https://github.com/rancher-sandbox/rancher-desktop/issues/3925).
+- The `Rules` key is added to the JSON config. Rules are used to determine
+  the value of the `Supported` key in each version returned from Upgrade Responder.
 
-For the purposes of Rancher Desktop development, several files have been added
+## How do I configure this version of Upgrade Responder?
+
+For context, this is what a request from Rancher Desktop to Upgrade Responder
+looks like:
+```json
+{
+  "appVersion": "1.6.0",
+  "extraInfo": {
+    "platform": "darwin-x64",
+    "platformVersion": "10.0.1"
+  }
+}
+```
+As you can see, information about the Rancher Desktop installation is provided:
+- the version of Rancher Desktop that is installed
+- the OS
+- the architecture
+- the version of the OS
+
+An example Upgrade Responder config looks like this:
+```json
+{
+  "Rules": [
+    {
+      "Criteria": {
+        "CurrentRDVersion": "*",
+        "Platform": "darwin",
+        "Arch": "*",
+        "PlatformVersion": "<11.0.0"
+      },
+      "Constraints": {
+        "Version": "<=1.8.0"
+      }
+    },
+    {
+      "Criteria": {
+        "CurrentRDVersion": "*",
+        "Platform": "*",
+        "Arch": "*",
+        "PlatformVersion": "*"
+      },
+      "Constraints": {
+        "Version": ">=0.0.0"
+      }
+    },
+  ],
+  "Versions": [
+    {
+      "Name": "1.10.0",
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": []
+    },
+    {
+      "Name": "1.9.1",
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": ["latest"]
+    },
+    {
+      "Name": "1.9.0",
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": []
+    },
+    {
+      "Name": "1.8.0",
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": []
+    },
+    {
+      "Name": "1.7.0",
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": []
+    }
+  ]
+}
+```
+As you can see, the config has two sections: `Rules` and `Versions`.
+`Versions` is the array of versions (minus the `Supported` key) that
+Upgrade responder sends to the client. `Rules` is an array of rules that
+are used to determine the value of `Supported` for each version.
+
+Each `Rule` has two sections: `Criteria` and `Constraints`. `Criteria`
+is used to determine whether the `Rule` applies to a given installation
+of Rancher Desktop. If the info sent by Rancher Desktop in the request
+matches all conditions in `Criteria`, then that `Rule` matches and its
+`Constraints` field applies. The constraints field is applied to each
+version to determine whether that version is `Supported`.
+
+Let's look at the following `Rule` as an example:
+```json
+ {
+   "Criteria": {
+     "CurrentRDVersion": "*",
+     "Platform": "darwin",
+     "Arch": "*",
+     "PlatformVersion": "<11.0.0"
+   },
+   "Constraints": {
+     "Version": "<=1.8.0"
+   }
+ }
+```
+This `Rule` matches if:
+- the version of Rancher Desktop installed on the client is anything AND
+- the OS of the Rancher Desktop installation is macOS AND
+- the architecture of the system on which Rancher Desktop is installed is anything AND
+- the version of macOS is less than 11.0.0
+
+If the client satisfies all of these conditions, then only versions that
+are less than or equal to 1.8.0 are `Supported`. The response would
+contain the following data:
+```json
+{
+  "versions": [
+    {
+      "Name": "1.10.0",
+      "Supported": false,
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": []
+    },
+    {
+      "Name": "1.9.1",
+      "Supported": false,
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": ["latest"]
+    },
+    {
+      "Name": "1.9.0",
+      "Supported": false,
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": []
+    },
+    {
+      "Name": "1.8.0",
+      "Supported": true,
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": []
+    },
+    {
+      "Name": "1.7.0",
+      "Supported": true,
+      "ReleaseDate": "2022-07-28T11:00:00Z",
+      "Tags": []
+    }
+  ]
+}
+```
+
+The order of `Rules` matters, because the code checks each
+rule until one applies, and then uses only that `Rule`. If no `Rule`
+matches, then every version has `Supported` set to `true`.
+
+The `latest` tag is another important detail. It is a legacy thing.
+Versions of Rancher Desktop earlier than 1.9.0 were not aware of
+the `Supported` key. Additionally, they used the `latest` tag to determine
+what version is the latest, i.e. which version to upgrade to. Newer
+versions of Rancher Desktop sort all of the versions according to semver
+to find the latest. So, we add the `latest` tag to 1.9.1 so that older versions
+of Rancher Desktop only upgrade to 1.9.1. After they do this, they respect
+the `Supported` key of each version, and by extension whichever version
+constraints we have configured Upgrade Responder to use.
+
+## How do I develop this version of Upgrade Responder?
+
+The below instructions for building Upgrade Responder still apply. For the
+purposes of Rancher Desktop development, several files have been added
 in `rancherdesktop/` that make development easier:
 
 `influxdb.sh`: starts an instance of influxDB for use with a development build of Upgrade Responder  
 `run.sh`: runs a development build of Upgrade Responder  
 
 Also note that an example configuration can be found at `rancherdesktop/testdata/test-config.json`.
+
+## How do I see the discussion around the modifications made to this fork?
+
+See [the original epic](https://github.com/rancher-sandbox/rancher-desktop/issues/3925).
 
 
 # Upgrade Responder[![Build Status](https://drone-publish.longhorn.io/api/badges/longhorn/upgrade-responder/status.svg)](https://drone-publish.longhorn.io/longhorn/upgrade-responder)
