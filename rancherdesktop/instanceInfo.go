@@ -55,11 +55,11 @@ func NewInstanceInfo(checkUpgradeRequest CheckUpgradeRequest) (InstanceInfo, err
 
 	platformAndArch, ok := extraTagInfo["platform"]
 	if !ok {
-		return InstanceInfo{}, errors.New("extraInfo.platform not present")
+		return InstanceInfo{}, errors.New("platform not present")
 	}
 	components := strings.Split(platformAndArch, "-")
 	if len(components) != 2 {
-		return InstanceInfo{}, fmt.Errorf("invalid extraInfo.platform %q", platformAndArch)
+		return InstanceInfo{}, fmt.Errorf("malformed platform %q", platformAndArch)
 	}
 
 	platform := components[0]
@@ -74,11 +74,11 @@ func NewInstanceInfo(checkUpgradeRequest CheckUpgradeRequest) (InstanceInfo, err
 
 	rawPlatformVersion, ok := extraTagInfo["platformVersion"]
 	if !ok {
-		return InstanceInfo{}, errors.New("extraInfo.platformVersion not present")
+		return InstanceInfo{}, errors.New("platformVersion not present")
 	}
 	platformVersion, err := semver.NewVersion(rawPlatformVersion)
 	if err != nil {
-		err := fmt.Errorf("failed to parse platformVersion %q as semver: %w", platformVersion, err)
+		err := fmt.Errorf("failed to parse platformVersion %q as semver: %w", rawPlatformVersion, err)
 		return InstanceInfo{}, err
 	}
 

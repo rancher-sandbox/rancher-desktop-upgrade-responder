@@ -7,22 +7,6 @@ pull_request_rules:
   actions:
     merge:
       method: rebase
-      
-- name: Automatically merge Renovate PRs
-  conditions:
-  - check-success="Build binaries"
-  - author = renovate[bot]
-  actions:
-    merge:
-      method: rebase
-
-- name: Automatically approve Renovate PRs
-  conditions:
-  - check-success="Build binaries"
-  - author = renovate[bot]
-  actions:
-    review:
-      type: APPROVE
 
 - name: Ask to resolve conflict
   conditions:

@@ -76,6 +76,36 @@ func TestNewInstanceInfo(t *testing.T) {
 		}
 	})
 
+	t.Run("should prefer extraTagInfo over extraInfo when both carry platform", func(t *testing.T) {
+		checkUpgradeRequest := CheckUpgradeRequest{
+			AppVersion: "1.2.3",
+			ExtraInfo: map[string]string{
+				"platform":        "linux-arm64",
+				"platformVersion": "1.0.0",
+			},
+			ExtraTagInfo: map[string]string{
+				"platform":        "darwin-x64",
+				"platformVersion": "12.0.3",
+			},
+		}
+		instanceInfo, err := NewInstanceInfo(checkUpgradeRequest)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if instanceInfo.Platform != "darwin" {
+			t.Errorf("expected extraTagInfo platform %q but got %q",
+				"darwin", instanceInfo.Platform)
+		}
+		if instanceInfo.Arch != "x64" {
+			t.Errorf("expected extraTagInfo arch %q but got %q",
+				"x64", instanceInfo.Arch)
+		}
+		if instanceInfo.PlatformVersion.String() != "12.0.3" {
+			t.Errorf("expected extraTagInfo platformVersion %q but got %q",
+				"12.0.3", instanceInfo.PlatformVersion)
+		}
+	})
+
 	testCases := []struct {
 		Description         string
 		CheckUpgradeRequest CheckUpgradeRequest
@@ -89,17 +119,17 @@ func TestNewInstanceInfo(t *testing.T) {
 		{
 			Description:         "should fail if CheckUpgradeRequest.ExtraInfo.platform is not valid",
 			CheckUpgradeRequest: newCheckUpgradeRequest("1.2.3", "darwin-x64-somethingElse", "12.0.3"),
-			ExpectedError:       "invalid extraInfo.platform",
+			ExpectedError:       "malformed platform",
 		},
 		{
 			Description:         "should fail if CheckUpgradeRequest.ExtraInfo.platform is not valid",
 			CheckUpgradeRequest: newCheckUpgradeRequest("1.2.3", "darwinx64", "12.0.3"),
-			ExpectedError:       "invalid extraInfo.platform",
+			ExpectedError:       "malformed platform",
 		},
 		{
 			Description:         "should fail if CheckUpgradeRequest.ExtraInfo.platform is not valid",
 			CheckUpgradeRequest: newCheckUpgradeRequest("1.2.3", "", "12.0.3"),
-			ExpectedError:       "invalid extraInfo.platform",
+			ExpectedError:       "malformed platform",
 		},
 		{
 			Description: "should fail if CheckUpgradeRequest.ExtraInfo.platform is not present",
@@ -109,7 +139,7 @@ func TestNewInstanceInfo(t *testing.T) {
 					"platformVersion": "12.0.3",
 				},
 			},
-			ExpectedError: "extraInfo.platform not present",
+			ExpectedError: "platform not present",
 		},
 		{
 			Description:         "should fail if parsed platform is not valid",
@@ -129,7 +159,7 @@ func TestNewInstanceInfo(t *testing.T) {
 					"platform": "darwin-x64",
 				},
 			},
-			ExpectedError: "extraInfo.platformVersion not present",
+			ExpectedError: "platformVersion not present",
 		},
 		{
 			Description:         "should fail if CheckUpgradeRequest.ExtraInfo.platformVersion is empty",
