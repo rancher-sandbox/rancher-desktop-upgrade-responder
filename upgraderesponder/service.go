@@ -512,6 +512,7 @@ func (s *Server) getTagsFromRequest(req *rd.CheckUpgradeRequest, location *Locat
 	tags := map[string]string{
 		InfluxDBTagAppVersion: req.AppVersion,
 	}
+	//nolint:staticcheck // the server reads the legacy ExtraInfo for backward compatibility
 	extraTagInfo := utils.MergeStringMaps(req.ExtraInfo, req.ExtraTagInfo)
 	for k, v := range extraTagInfo {
 		if s.ValidateExtraInfo(k, v, extraInfoTypeTag) {
@@ -547,6 +548,7 @@ func (s *Server) getTemplateVarsFromRequest(req *rd.CheckUpgradeRequest) map[str
 		TagAppVersion: req.AppVersion,
 	}
 
+	//nolint:staticcheck // the server reads the legacy ExtraInfo for backward compatibility
 	extraTagInfo := utils.MergeStringMaps(req.ExtraInfo, req.ExtraTagInfo)
 	for k, v := range extraTagInfo {
 		if s.ValidateExtraInfo(k, v, extraInfoTypeTag) {

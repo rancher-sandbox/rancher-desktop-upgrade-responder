@@ -46,6 +46,36 @@ func TestNewInstanceInfo(t *testing.T) {
 		}
 	})
 
+	t.Run("should read platform info sent via extraTagInfo", func(t *testing.T) {
+		appVersion := "1.2.3"
+		platform := "darwin"
+		arch := "x64"
+		platformVersion := "12.0.3"
+		checkUpgradeRequest := CheckUpgradeRequest{
+			AppVersion: appVersion,
+			ExtraTagInfo: map[string]string{
+				"platform":        fmt.Sprintf("%s-%s", platform, arch),
+				"platformVersion": platformVersion,
+			},
+		}
+		instanceInfo, err := NewInstanceInfo(checkUpgradeRequest)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if instanceInfo.Platform != platform {
+			t.Errorf("expected instanceInfo.Platform %q but got %q",
+				platform, instanceInfo.Platform)
+		}
+		if instanceInfo.Arch != arch {
+			t.Errorf("expected instanceInfo.Arch %q but got %q",
+				arch, instanceInfo.Arch)
+		}
+		if instanceInfo.PlatformVersion.String() != platformVersion {
+			t.Errorf("expected instanceInfo.PlatformVersion %q but got %q",
+				platformVersion, instanceInfo.PlatformVersion)
+		}
+	})
+
 	testCases := []struct {
 		Description         string
 		CheckUpgradeRequest CheckUpgradeRequest

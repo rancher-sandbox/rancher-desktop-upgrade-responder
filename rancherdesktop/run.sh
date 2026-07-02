@@ -1,5 +1,7 @@
 #!/bin/sh
+set -e
 REPO_ROOT=$(git rev-parse --show-toplevel)
+go build -o "$REPO_ROOT/bin/upgrade-responder" "$REPO_ROOT"
 $REPO_ROOT/bin/upgrade-responder --debug start \
       --upgrade-response-config $REPO_ROOT/rancherdesktop/testdata/test-config.json \
       --request-schema $REPO_ROOT/rancherdesktop/testdata/test-request-schema.json \
