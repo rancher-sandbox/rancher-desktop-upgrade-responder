@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -27,6 +29,11 @@ const (
 	InfluxDBContinuousQueryDownSampling  = "cq_upgrade_request_down_sampling"
 	InfluxDBContinuousQueryByAppVersion  = "cq_by_app_version_down_sampling"
 	InfluxDBContinuousQueryByCountryCode = "cq_by_country_code_down_sampling"
+
+	TagVersion    = "version"
+	TagAppVersion = "appVersion"
+
+	influxClientTimeOut = 10 * time.Second
 )
 
 var (
@@ -43,6 +50,11 @@ var (
 	HTTPHeaderXForwardedFor = "X-Forwarded-For"
 	ValueFieldKey           = "value" // A dummy InfluxDB field used to count the number of points
 	ValueFieldValue         = 1
+
+	extraInfoTypeTag   = "tag"
+	extraInfoTypeField = "field"
+
+	defaultMaxStringValueLength = 200
 )
 
 type Server struct {
@@ -56,6 +68,8 @@ type Server struct {
 	influxClient        influxcli.Client
 	db                  *maxminddb.Reader
 	dbCache             *DBCache
+	RequestSchema       RequestSchema
+	scarfService        *ScarfService
 }
 
 // PrecomputedVersion is used as a "mapping" from a Rule to the set of
@@ -75,26 +89,103 @@ type Location struct {
 	} `json:"country"`
 }
 
+type RequestSchema struct {
+	AppVersionSchema     Schema            `json:"appVersionSchema"`
+	ExtraTagInfoSchema   map[string]Schema `json:"extraTagInfoSchema"`
+	ExtraFieldInfoSchema map[string]Schema `json:"extraFieldInfoSchema"`
+}
+
+type Schema struct {
+	DataType string `json:"dataType"`
+	MaxLen   int    `json:"maxLen"`
+}
+
+func (sc *Schema) Validate(value interface{}) (isValid bool) {
+	defer func() {
+		if !isValid {
+			logrus.Debugf("validate failed: schema %+v, value %v", sc, value)
+		}
+	}()
+
+	switch sc.DataType {
+	case "string":
+		v, ok := value.(string)
+		if !ok {
+			return false
+		}
+		maxLen := defaultMaxStringValueLength
+		if sc.MaxLen > 0 {
+			maxLen = sc.MaxLen
+		}
+		return len(v) <= maxLen
+	case "float":
+		if _, ok := value.(float64); !ok {
+			return false
+		}
+		return true
+	case "boolean":
+		if _, ok := value.(bool); !ok {
+			return false
+		}
+		return true
+	}
+	return false
+}
+
+func (s *Server) ValidateExtraInfo(key string, value interface{}, extraInfoType string) bool {
+	switch extraInfoType {
+	case extraInfoTypeTag:
+		schema, ok := s.RequestSchema.ExtraTagInfoSchema[key]
+		if !ok {
+			return false
+		}
+		return schema.Validate(value)
+	case extraInfoTypeField:
+		schema, ok := s.RequestSchema.ExtraFieldInfoSchema[key]
+		if !ok {
+			return false
+		}
+		return schema.Validate(value)
+	default:
+		return false
+	}
+}
+
 type CheckUpgradeResponse struct {
 	Versions                 []rd.Version `json:"versions"`
 	RequestIntervalInMinutes int          `json:"requestIntervalInMinutes"`
 }
 
-func NewServer(done chan struct{}, applicationName, configFile, influxURL, influxUser, influxPass, queryPeriod, geodb string, cacheSyncInterval, cacheSize int) (*Server, error) {
+func NewServer(done chan struct{}, applicationName, responseConfigFilePath, requestSchemaFilePath, influxURL, influxUser, influxPass, queryPeriod, geodb string, cacheSyncInterval, cacheSize int, scarfEndpoints []string, scarfTimeout int) (*Server, error) {
 	InfluxDBDatabase = applicationName + "_" + InfluxDBDatabase
 	InfluxDBContinuousQueryPeriod = queryPeriod
 
-	config, err := rd.ReadConfig(configFile)
+	config, err := rd.ReadConfig(responseConfigFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config: %w", err)
+	}
+
+	requestSchemaFile, err := os.Open(filepath.Clean(requestSchemaFilePath))
+	if err != nil {
+		return nil, errors.Wrapf(err, "fail to open requestSchemaFile at %v", requestSchemaFilePath)
+	}
+	defer requestSchemaFile.Close()
+
+	var requestSchema RequestSchema
+	if err := json.NewDecoder(requestSchemaFile).Decode(&requestSchema); err != nil {
+		return nil, err
 	}
 
 	s := &Server{
 		done:            done,
 		DefaultVersions: config.Versions,
+		scarfService:    NewScarfService(scarfEndpoints, scarfTimeout),
 	}
 	if err := s.generatePrecomputedVersions(config); err != nil {
 		return nil, fmt.Errorf("failed to generate precomputed versions: %w", err)
+	}
+	if err := s.validateAndLoadRequestSchema(requestSchema); err != nil {
+		return nil, err
 	}
 
 	db, err := maxminddb.Open(geodb)
@@ -108,6 +199,7 @@ func NewServer(done chan struct{}, applicationName, configFile, influxURL, influ
 		cfg := influxcli.HTTPConfig{
 			Addr:               influxURL,
 			InsecureSkipVerify: true,
+			Timeout:            influxClientTimeOut,
 		}
 		if influxUser != "" {
 			cfg.Username = influxUser
@@ -202,6 +294,41 @@ func (s *Server) createContinuousQueries(dbName string) error {
 	return nil
 }
 
+func (s *Server) validateAndLoadRequestSchema(requestSchema RequestSchema) error {
+	if requestSchema.AppVersionSchema.DataType != "string" {
+		return fmt.Errorf("AppVersionSchema must have string data type: %v", requestSchema.AppVersionSchema.DataType)
+	}
+	if requestSchema.AppVersionSchema.MaxLen < 0 {
+		return fmt.Errorf("AppVersionSchema must have MaxLen >= 0")
+	}
+
+	for schemaName, schema := range requestSchema.ExtraFieldInfoSchema {
+		switch schema.DataType {
+		case "string":
+			if schema.MaxLen < 0 {
+				return fmt.Errorf("schema %v with data type string must have Maxlen >= 0", schemaName)
+			}
+		case "float", "boolean":
+		default:
+			return fmt.Errorf("field schema %v has invalid data type %v", schemaName, schema.DataType)
+		}
+	}
+
+	for schemaName, schema := range requestSchema.ExtraTagInfoSchema {
+		switch schema.DataType {
+		case "string":
+			if schema.MaxLen < 0 {
+				return fmt.Errorf("schema %v of data type string must have Maxlen >= 0", schemaName)
+			}
+		default:
+			return fmt.Errorf("tag schema %v must have string data type %v", schemaName, schema.DataType)
+		}
+	}
+
+	s.RequestSchema = requestSchema
+	return nil
+}
+
 func (s *Server) HealthCheck(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
@@ -235,7 +362,6 @@ func (s *Server) CheckUpgrade(rw http.ResponseWriter, req *http.Request) {
 		logrus.Errorf("Failed to repsondWithJSON: %v", err)
 		return
 	}
-	return
 }
 
 func respondWithJSON(rw http.ResponseWriter, obj interface{}) error {
@@ -323,41 +449,37 @@ func (s *Server) recordRequest(httpReq *http.Request, req *rd.CheckUpgradeReques
 	}
 
 	// We use IP to find the location but we don't store IP
-	loc, err := s.getLocation(publicIP)
+	location, err := s.getLocation(publicIP)
 	if err != nil {
 		logrus.Error("Failed to get location for one ip")
 	}
 
+	// Validate the request before sending events
+	if !s.RequestSchema.AppVersionSchema.Validate(req.AppVersion) {
+		logrus.Errorf("AppVersion %v is not valid according to schema %+v", req.AppVersion, s.RequestSchema.AppVersionSchema)
+		return
+	}
+
+	templateVars := s.getTemplateVarsFromRequest(req)
+
+	// Send Scarf.sh event asynchronously for all valid requests
+	s.scarfService.SendEvent(req.AppVersion, templateVars, publicIP)
+
 	if s.influxClient != nil {
-		var (
-			err error
-			pt  *influxcli.Point
-		)
+		var err error
 		defer func() {
 			if err != nil {
 				logrus.Errorf("Failed to recordRequest: %v", err)
 			}
 		}()
 
-		tags := map[string]string{
-			InfluxDBTagAppVersion: req.AppVersion,
-		}
-		for k, v := range req.ExtraInfo {
-			tags[utils.ToSnakeCase(k)] = v
-		}
-		fields := map[string]interface{}{
-			utils.ToSnakeCase(ValueFieldKey): ValueFieldValue,
-		}
-		if loc != nil {
-			tags[InfluxDBTagLocationCity] = loc.City
-			tags[InfluxDBTagLocationCountry] = loc.Country.Name
-			tags[InfluxDBTagLocationCountryISOCode] = loc.Country.ISOCode
-		}
-		pt, err = influxcli.NewPoint(InfluxDBMeasurement, tags, fields, time.Now())
+		tags := s.getTagsFromRequest(req, location)
+		fields := s.getFieldsFromRequest(req)
+
+		pt, err := influxcli.NewPoint(InfluxDBMeasurement, tags, fields, time.Now())
 		if err != nil {
 			return
 		}
-
 		s.dbCache.AddPoint(pt)
 	}
 }
@@ -384,4 +506,65 @@ func (s *Server) generatePrecomputedVersions(config rd.ResponseConfig) error {
 
 	s.PrecomputedVersions = rulesWithPrecomputedVersions
 	return nil
+}
+
+func (s *Server) getTagsFromRequest(req *rd.CheckUpgradeRequest, location *Location) map[string]string {
+	tags := map[string]string{
+		InfluxDBTagAppVersion: req.AppVersion,
+	}
+	//nolint:staticcheck // the server reads the legacy ExtraInfo for backward compatibility
+	extraTagInfo := utils.MergeStringMaps(req.ExtraInfo, req.ExtraTagInfo)
+	for k, v := range extraTagInfo {
+		if s.ValidateExtraInfo(k, v, extraInfoTypeTag) {
+			tags[utils.ToSnakeCase(k)] = v
+		}
+	}
+
+	if location != nil {
+		tags[InfluxDBTagLocationCity] = location.City
+		tags[InfluxDBTagLocationCountry] = location.Country.Name
+		tags[InfluxDBTagLocationCountryISOCode] = location.Country.ISOCode
+	}
+
+	return tags
+}
+
+func (s *Server) getFieldsFromRequest(req *rd.CheckUpgradeRequest) map[string]interface{} {
+	fields := map[string]interface{}{
+		utils.ToSnakeCase(ValueFieldKey): ValueFieldValue,
+	}
+	for k, v := range req.ExtraFieldInfo {
+		if s.ValidateExtraInfo(k, v, extraInfoTypeField) {
+			fields[utils.ToSnakeCase(k)] = v
+		}
+	}
+
+	return fields
+}
+
+func (s *Server) getTemplateVarsFromRequest(req *rd.CheckUpgradeRequest) map[string]string {
+	reserved := map[string]string{
+		TagVersion:    req.AppVersion,
+		TagAppVersion: req.AppVersion,
+	}
+
+	//nolint:staticcheck // the server reads the legacy ExtraInfo for backward compatibility
+	extraTagInfo := utils.MergeStringMaps(req.ExtraInfo, req.ExtraTagInfo)
+	for k, v := range extraTagInfo {
+		if s.ValidateExtraInfo(k, v, extraInfoTypeTag) {
+			if _, exists := reserved[k]; !exists {
+				reserved[k] = v
+			}
+		}
+	}
+
+	for k, v := range req.ExtraFieldInfo {
+		if s.ValidateExtraInfo(k, v, extraInfoTypeField) {
+			if _, exists := reserved[k]; !exists {
+				reserved[k] = fmt.Sprint(v)
+			}
+		}
+	}
+
+	return reserved
 }

@@ -178,6 +178,13 @@ of Rancher Desktop only upgrade to 1.9.1. After they do this, they respect
 the `Supported` key of each version, and by extension whichever version
 constraints we have configured Upgrade Responder to use.
 
+In addition to the response config, the server requires a request schema
+file (`--request-schema`) listing the accepted `extraInfo`/`extraTagInfo`
+keys; it drops any key missing from the schema before writing to InfluxDB.
+For Rancher Desktop the schema must include `platform` and `platformVersion`
+as string tags; see `rancherdesktop/testdata/test-request-schema.json` for
+an example.
+
 ## How do I develop this version of Upgrade Responder?
 
 The below instructions for building Upgrade Responder still apply. For the
@@ -194,11 +201,12 @@ Also note that an example configuration can be found at `rancherdesktop/testdata
 See [the original epic](https://github.com/rancher-sandbox/rancher-desktop/issues/3925).
 
 
-# Upgrade Responder[![Build Status](https://drone-publish.longhorn.io/api/badges/longhorn/upgrade-responder/status.svg)](https://drone-publish.longhorn.io/longhorn/upgrade-responder)
+# Upgrade Responder
 
 ## Overview
 Upgrade Responder provides a way to notify the applications running remotely when there is a new version of the application become available. 
 It will also keep a record of how many requests have been sent to the Upgrade Responder server during a certain period of time(e.g. one hour), to estimate how many instances of applications are running during that period.
+It can also be used to collect telemetric.
 
 Upgrade Responder server doesn't store any information that can be potentially used to identify the client that makes the request, including IP address. See [here](#what-data-will-be-stored) for a full list of data that will be stored.
 
@@ -207,10 +215,12 @@ For example, Longhorn uses Upgrade Responder project to create the public metric
 
 ## How it works
 1. Upgrade Responder server is set up at an application-specified endpoint.
-1. A response JSON file (e.g. [upgrade-response.json](#response-json-config-example)) is provided to the server as the response to the incoming request.
+1. A response JSON file (e.g. [response-config.json](#response-config-example)) is provided to the server as the response to the incoming request.
    1. In Kubernetes deployment, the response JSON is normally configured as a Config Map and can be easily swapped out when a new version is available.
+1. A request schema JSON file (e.g. [request-schema.json](#request-schema-example)) is provided to the server to verify the format of incoming requests.
 1. The application now can make HTTP requests in a certain format to the application-specified endpoint periodically, and get the information about the latest available version.
    1. Server will expect each instance of the application makes a request **once per hour**.
+   1. The application can also send additional useful telemetric. 
 1. Once the server received a request, it will:
    1. Check where the request is coming from.
    1. Remove the IP from the request.
@@ -220,6 +230,7 @@ For example, Longhorn uses Upgrade Responder project to create the public metric
 * Application Version
 * Country and City of the request originated from
 * (Optional) Application specified information that's can be helpful to identify the upgradability, e.g. Kubernetes version that application is running on.
+* (Optional) Application telemetric 
 
 ## Prerequisite
 1. InfluxDB <= 1.8.x is running. We currently only support InfluxDB version <= 1.8.x.
@@ -234,16 +245,22 @@ Start Upgrade Responder server by the command:
 ```
 The available flags are:
 
-| Flag  | Example value  | Description  |
-|---|---|---|
-| `--upgrade-response-config` | `/etc/upgrade-responder/upgrade-response.json` | Specify the response configuration file for upgrade query. The Upgrade Responder server uses this file to determine the latest version of the application. See [upgrade-response.json](#response-json-config-example) for an example of a configuration file  |
-| `--application-name` | `awesome_app` | Specify the name of the application that is using this Upgrade Responder server. This will be used to create a database named `<application-name>_upgrade_responder` in the InfluxDB to store all data for this Upgrade Responder |
-| `--influxdb-url` | `http://localhost:8086` | Specify the URL of InfluxDB. Note that we currently only support InfluxDB version 1.8 and before  |
-| `--influxdb-user` | `admin` | Specify the InfluxDB username |
-| `--influxdb-pass` | `password` | Specify the InfluxDB password |
-| `--query-period` | `1h` | Specify the period for how often each instance of the application makes the request. Cannot change after set for the first time See [here](#the-flag---query-period) for more details |
-| `--geodb` | `/etc/upgrade-responder/GeoLite2-City.mmdb` | Specify the path of to GeoDB file.  See [Geography database](#geography-database) for more details about GeoDB |
-| `--port` | `8314` | Specify the port number. By default port `8314` is used |
+| Flag  | Example value                                          | Description                                                                                                                                                                                                                       |
+|---|--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--upgrade-response-config` | `/etc/upgrade-responder/response-config.json`          | Specify the response configuration file for upgrade query. The Upgrade Responder server uses this file to determine the latest version of the application. See [response-config.json](#response-config-example) for an example    |
+| `--request-schema` | `/etc/upgrade-responder/request-schema.json`           | Specify the client request schema. The Upgrade Responder server uses this file to determine/validate the client request. See [request-schema.json](#request-schema-example) for an example                                        |
+| `--application-name` | `awesome_app`                                          | Specify the name of the application that is using this Upgrade Responder server. This will be used to create a database named `<application-name>_upgrade_responder` in the InfluxDB to store all data for this Upgrade Responder |
+| `--influxdb-url` | `http://localhost:8086`                                | Specify the URL of InfluxDB. Note that we currently only support InfluxDB version 1.8 and before                                                                                                                                  |
+| `--influxdb-user` | `admin`                                                | Specify the InfluxDB username                                                                                                                                                                                                     |
+| `--influxdb-pass` | `password`                                             | Specify the InfluxDB password                                                                                                                                                                                                     |
+| `--query-period` | `1h`                                                   | Specify the period for how often each instance of the application makes the request. Cannot change after set for the first time See [here](#the-flag---query-period) for more details                                             |
+| `--geodb` | `/etc/upgrade-responder/GeoLite2-City.mmdb`            | Specify the path of to GeoDB file.  See [Geography database](#geography-database) for more details about GeoDB                                                                                                                    |
+| `--port` | `8314`                                                 | Specify the port number. By default port `8314` is used                                                                                                                                                                           |           
+| `--cache-sync-interval` | `1`                                                    | Specify the period for how often the server should sync data to database. Measured in second. The server aggregates the client requests before writing to influxDB. Default value is `1`                                          |                    
+| `--cache-size` | `100`                                                  | Specify the cache size of server. Once the number of data points in cache is bigger than cache size, the server flush and write all data in the cache to influxDB. Default value is `100`                                         |          
+| `--scarf-endpoint` | `https://your.gateway.scarf.sh/packageroute/{version}` | Specify the Scarf.sh endpoint URL template. Can be specified multiple times. Supports {version} placeholder (always available) and any custom field from the upgrade request (e.g., {longhornDistro}). Default value is empty which means scarf is not being used.                                                                   |
+| `--scarf-timeout` | `30`                                                   | Specify the timeout in seconds for Scarf.sh requests. Default value is `30`|                                                                                                                                                        |
+
 
 If you are deploying Upgrade Responder Server in Kubernetes, you can use our provided [chart](./chart).
 
@@ -254,9 +271,9 @@ If you are deploying Upgrade Responder Server in Kubernetes, you can use our pro
 As a quick way to check Upgrade Responder server is up and running, make a request to it:
 ```shell
 curl -X POST http://<SERVER-IP>:8314/v1/checkupgrade \
-     -d '{ "appVersion": "v0.8.1", "extraInfo": {}}' 
+     -d '{ "appVersion": "v0.8.1", "extraTagInfo": {}, "extraFieldInfo": {}}' 
 ```
-If the server is running correctly, you should receive a response contains the application's latest version stored in [upgrade-response.json](#response-json-config-example):
+If the server is running correctly, you should receive a response contains the application's latest version stored in [response-config.json](#response-config-example):
 ```shell
 {"versions":[{"Name":"v1.0.0","ReleaseDate":"2020-05-30T10:20:00Z","Tags":["latest"]}],"requestIntervalInMinutes":60}
 ```
@@ -291,17 +308,24 @@ Upon success, you should see a dashboard similar to:
 Modify your application to periodically send the request to Upgrade Responder server every `requestIntervalInMinutes` where `requestIntervalInMinutes` is the value returned from Upgrade Responder sever when your application makes an upgrade request to it. 
 Your application should send one `POST` request every `requestIntervalInMinutes`. 
 The request's body should be in the format:
-   ```json
-   {
+```json
+{
     "appVersion": "v0.8.1",
-    "extraInfo": {
-        "fieldKey": "value"
+    "extraTagInfo": {
+        "tagKey": "value"
+    },
+    "extraFieldInfo": {
+       "fieldKey": "value"
     }
-   }
-   ```
+}
+```
+* `appVersion` is the current version of the client
+* `extraTagInfo` contains the information which will be stored as [InfluxDB tags](https://docs.influxdata.com/influxdb/v1.8/concepts/glossary/#tag). This must have string type.
+* `extraFieldInfo` contains the information which will be stored as [InfluxDB fields](https://docs.influxdata.com/influxdb/v1.8/concepts/glossary/#field). This can be string, boolean, or float. You can perform various operation on `field` value such as `sum`, `mean`, `median`,...
+
 By default, Upgrade Responder only groups data by `appVersion` field and creates Grafana panel for `appVersion` field. 
-If you add extra fields and want to display statical information for those fields, there are extra steps you need to follow to setup InfluxDB and Grafana. 
-See [Add kubernetesVersion extra field](#add-kubernetesVersion-extra-field) for an example of how to add an extra field. 
+If you add extra tags and want to display statical information for those tags, there are extra steps you need to follow to setup InfluxDB and Grafana. 
+See [Add kubernetesVersion extra tag](#add-kubernetesVersion-extra-tag) for an example of how to add an extra tag. 
 
 #### Go client
 If your application is written in Golang, you can import our provided [client package](./client) and use it to save time writing code. 
@@ -310,24 +334,48 @@ See our [example](./example) for how to use the client package.
 
 ## References
 
-### Response JSON config example
+### Response config example
 ```
 {
-	"Versions": [{
-		"Name": "v1.0.0",
-		"ReleaseDate": "2020-05-30T10:20:00Z",
-		"Tags": ["latest"]
+	"versions": [{
+		"name": "v1.0.0",
+		"releaseDate": "2020-05-30T10:20:00Z",
+		"tags": ["latest"]
 	}]
 }
 ```
 
-### Add kubernetesVersion extra field
-For example, if you want to keep track of the number of your application instances by each Kubernetes version, you may want to include Kubernetes version into `extraInfo` in the request's body sent to Upgrade Responder server.
+### Request Schema Example
+```
+{
+   "appVersionSchema": {
+     "dataType": "string",
+     "maxLen": 200
+   },
+   "extraTagInfoSchema": {
+     "kubernetesVersion": {
+       "dataType": "string",
+       "maxLen": 200
+     }
+   },
+   "extraFieldInfoSchema": {
+     "nodeCount": {
+       "dataType": "float"
+     },
+     "diskUsageBytes": {
+       "dataType": "float"
+     }
+   }
+}
+```
+
+### Add kubernetesVersion extra tag
+For example, if you want to keep track of the number of your application instances by each Kubernetes version, you may want to include Kubernetes version into `extraTagInfo` in the request's body sent to Upgrade Responder server.
 The request's body may look like this:
 ```json
 {
     "appVersion": "v0.8.1",
-    "extraInfo": {
+    "extraTagInfo": {
         "kubernetesVersion": "v1.19.1"
     }
 }
@@ -388,7 +436,7 @@ This program doesn't store IP. Only the city level geographic data is recorded.
 
 ### 2. Running locally 
 
-`./bin/upgrade-responder --debug start --upgrade-response-config /etc/upgrade-responder/upgrade-response.json --application-name postman --influxdb-url http://localhost:8086 --influxdb-user admin --influxdb-pass admin123 --geodb /etc/upgrade-checker/GeoLite2-City.mmdb`
+`./bin/upgrade-responder --debug start --upgrade-response-config /etc/upgrade-responder/response-config.json --request-schema /etc/upgrade-responder/request-schema.json --application-name postman --influxdb-url http://localhost:8086 --influxdb-user admin --influxdb-pass admin123 --geodb /etc/upgrade-checker/GeoLite2-City.mmdb`
 
 It will listen on `0.0.0.0:8314`
 

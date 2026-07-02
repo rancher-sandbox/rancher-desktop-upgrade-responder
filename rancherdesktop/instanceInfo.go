@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+
+	"github.com/longhorn/upgrade-responder/utils"
 )
 
 var validPlatform map[string]bool = map[string]bool{
@@ -20,8 +22,12 @@ var validArch map[string]bool = map[string]bool{
 }
 
 type CheckUpgradeRequest struct {
-	AppVersion string            `json:"appVersion"`
-	ExtraInfo  map[string]string `json:"extraInfo"`
+	AppVersion     string                 `json:"appVersion"`
+	ExtraTagInfo   map[string]string      `json:"extraTagInfo"`
+	ExtraFieldInfo map[string]interface{} `json:"extraFieldInfo"`
+
+	// Deprecated: replaced by ExtraTagInfo
+	ExtraInfo map[string]string `json:"extraInfo"`
 }
 
 // InstanceInfo contains all the info we need about an instance of Rancher Desktop.
@@ -43,13 +49,17 @@ func NewInstanceInfo(checkUpgradeRequest CheckUpgradeRequest) (InstanceInfo, err
 		return InstanceInfo{}, fmt.Errorf("failed to parse AppVersion as semver: %w", err)
 	}
 
-	platformAndArch, ok := checkUpgradeRequest.ExtraInfo["platform"]
+	// Accept platform info from the deprecated extraInfo or the current
+	// extraTagInfo, with extraTagInfo winning, as the telemetry path does.
+	extraTagInfo := utils.MergeStringMaps(checkUpgradeRequest.ExtraInfo, checkUpgradeRequest.ExtraTagInfo)
+
+	platformAndArch, ok := extraTagInfo["platform"]
 	if !ok {
-		return InstanceInfo{}, errors.New("extraInfo.platform not present")
+		return InstanceInfo{}, errors.New("platform not present")
 	}
 	components := strings.Split(platformAndArch, "-")
 	if len(components) != 2 {
-		return InstanceInfo{}, fmt.Errorf("invalid extraInfo.platform %q", platformAndArch)
+		return InstanceInfo{}, fmt.Errorf("malformed platform %q", platformAndArch)
 	}
 
 	platform := components[0]
@@ -62,13 +72,13 @@ func NewInstanceInfo(checkUpgradeRequest CheckUpgradeRequest) (InstanceInfo, err
 		return InstanceInfo{}, fmt.Errorf("invalid arch %q", arch)
 	}
 
-	rawPlatformVersion, ok := checkUpgradeRequest.ExtraInfo["platformVersion"]
+	rawPlatformVersion, ok := extraTagInfo["platformVersion"]
 	if !ok {
-		return InstanceInfo{}, errors.New("extraInfo.platformVersion not present")
+		return InstanceInfo{}, errors.New("platformVersion not present")
 	}
 	platformVersion, err := semver.NewVersion(rawPlatformVersion)
 	if err != nil {
-		err := fmt.Errorf("failed to parse platformVersion %q as semver: %w", platformVersion, err)
+		err := fmt.Errorf("failed to parse platformVersion %q as semver: %w", rawPlatformVersion, err)
 		return InstanceInfo{}, err
 	}
 

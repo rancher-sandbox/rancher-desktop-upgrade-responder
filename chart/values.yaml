@@ -18,11 +18,18 @@ secret:
 configMap:
   responseConfig: |-
     {
-       "Versions": [{
-          "Name": "v1.0.0",
-          "ReleaseDate": "2020-05-18T12:30:00Z",
-          "Tags": ["latest"]
-       }]
+      "versions": [{
+        "name": "v1.0.0",
+        "releaseDate": "2020-05-18T12:30:00Z",
+        "tags": ["latest"]
+      }]
+    }
+  requestSchema: |-
+    {
+      "appVersionSchema": {
+        "dataType": "string",
+        "maxLen": 200
+      }
     }
 
 replicaCount: 3
@@ -42,6 +49,8 @@ service:
 flags:
   cacheSyncInterval: 1
   cacheSize: 100
+  scarfEndpoint: "" # Optional: string or list of URL templates. Supports {version} (always available) and any custom field from upgrade request (e.g., {longhornDistro})
+  scarfTimeout: 30 # Timeout in seconds for Scarf.sh requests
 
 ingress:
   enabled: false
@@ -52,17 +61,17 @@ ingress:
   hosts:
     - example.com
   tls:
-   - secretName: example-com-tls
-     hosts:
-       - example.com
+    - secretName: example-com-tls
+      hosts:
+        - example.com
 
 resources:
   limits:
-   cpu: 200m
-   memory: 256Mi
+    cpu: 200m
+    memory: 256Mi
   requests:
-   cpu: 100m
-   memory: 128Mi
+    cpu: 100m
+    memory: 128Mi
 
 nodeSelector: {}
 

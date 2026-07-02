@@ -1,0 +1,16 @@
+pull_request_rules:
+- name: Automatically merge PRs
+  conditions:
+  - check-success="Build binaries"
+  - "#approved-reviews-by>=2"
+  - approved-reviews-by=@longhorn/maintainer
+  actions:
+    merge:
+      method: rebase
+
+- name: Ask to resolve conflict
+  conditions:
+  - conflict
+  actions:
+    comment:
+      message: This pull request is now in conflict. Could you fix it @{{author}}? 🙏
