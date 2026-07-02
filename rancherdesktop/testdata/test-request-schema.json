@@ -1,0 +1,16 @@
+{
+  "appVersionSchema": {
+    "dataType": "string",
+    "maxLen": 200
+  },
+  "extraTagInfoSchema": {
+    "platform": {
+      "dataType": "string",
+      "maxLen": 200
+    },
+    "platformVersion": {
+      "dataType": "string",
+      "maxLen": 200
+    }
+  }
+}

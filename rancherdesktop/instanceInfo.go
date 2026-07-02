@@ -20,8 +20,12 @@ var validArch map[string]bool = map[string]bool{
 }
 
 type CheckUpgradeRequest struct {
-	AppVersion string            `json:"appVersion"`
-	ExtraInfo  map[string]string `json:"extraInfo"`
+	AppVersion     string                 `json:"appVersion"`
+	ExtraTagInfo   map[string]string      `json:"extraTagInfo"`
+	ExtraFieldInfo map[string]interface{} `json:"extraFieldInfo"`
+
+	// Deprecated: replaced by ExtraTagInfo
+	ExtraInfo map[string]string `json:"extraInfo"`
 }
 
 // InstanceInfo contains all the info we need about an instance of Rancher Desktop.
